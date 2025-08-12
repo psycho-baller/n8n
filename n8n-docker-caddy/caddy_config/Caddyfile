@@ -1,0 +1,22 @@
+# Using environment variables for domain and subdomain
+n8n.rami-maalouf.tech {
+    # Use the SSL certificate files from the specified paths
+    tls /config/ssl/cert.pem /config/ssl/key.key
+
+    # Reverse proxy to n8n service
+    reverse_proxy n8n:5678 {
+        flush_interval -1
+    }
+
+    # Security headers
+    header {
+        # Enable HSTS (HTTP Strict Transport Security)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Prevent MIME-type sniffing
+        X-Content-Type-Options "nosniff"
+        # Prevent clickjacking
+        X-Frame-Options "DENY"
+        # Enable XSS protection
+        X-XSS-Protection "1; mode=block"
+    }
+}
