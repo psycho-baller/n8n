@@ -66,15 +66,15 @@ services:
     networks:
       - web
     ports:
-      - "80:80"    # HTTP
-      - "443:443"  # HTTPS
-      - "443:443/udp"  # HTTP/3
+      # Expose the custom HTTPS port on the host, mapping to Caddy's internal port 443
+      - "${N8N_EXTERNAL_HTTPS_PORT}:443"
+    # ports:
+    #   - 80:80
+    #   - 443:443
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   postgres:
     image: postgres:16
