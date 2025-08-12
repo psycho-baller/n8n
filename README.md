@@ -1,6 +1,8 @@
-# Register your account on DigitalOcean
+# Run n8n + PostgreSQL + Caddy + Cloudflare SSL in your VPS
 
-[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%201.svg)](https://www.digitalocean.com/?refcode=e0496d81b971&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+This was forked from https://github.com/trungpv1601/n8n-docker-cloudflare-setup
+
+I just added postgresql to the setup in [n8n-docker-caddy](https://github.com/psycho-baller/n8n/n8n-docker-caddy)
 
 # n8n Docker Setup with Caddy and Cloudflare SSL
 
