@@ -1,0 +1,121 @@
+volumes:
+  db_storage:
+  n8n_storage:
+  redis_storage:
+  caddy_data:
+  caddy_config:
+
+networks:
+  web:
+    driver: bridge
+
+x-shared: &shared
+  restart: always
+  image: n8nio/n8n:latest
+  environment:
+    - DB_TYPE=postgresdb
+    - DB_POSTGRESDB_HOST=postgres
+    - DB_POSTGRESDB_PORT=5432
+    - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+    - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
+    - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
+    - EXECUTIONS_MODE=queue
+    - QUEUE_BULL_REDIS_HOST=redis
+    - QUEUE_HEALTH_CHECK_ACTIVE=true
+    - N8N_RUNNERS_ENABLED=true
+    # - N8N_PROXY_HOPS=2
+    # - N8N_PORT=5678
+    - N8N_PROTOCOL=https
+    - N8N_ENV=production
+    # - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+    - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+    - TZ=${GENERIC_TIMEZONE}
+    - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    # --- Webhook & URL Settings ---
+    # IMPORTANT: Use HTTPS and the custom external port Caddy is listening on!
+    - WEBHOOK_URL=https://${N8N_DOMAIN}:${N8N_EXTERNAL_HTTPS_PORT}/
+    # Tell n8n it's behind a proxy handling TLS
+    - N8N_SECURE_COOKIE=true
+    - N8N_PROXY_SSL_HEADER=X-Forwarded-Proto # Standard header Caddy uses
+  links:
+    - postgres
+    - redis
+  volumes:
+    - n8n_storage:/home/node/.n8n
+  networks:
+    - web
+  depends_on:
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+      args:
+        - CADDY_VERSION=2
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - n8n
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    networks:
+      - web
+    ports:
+      - "80:80"    # HTTP
+      - "443:443"  # HTTPS
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_NON_ROOT_USER
+      - POSTGRES_NON_ROOT_PASSWORD
+    volumes:
+      - db_storage:/var/lib/postgresql/data
+      - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - web
+
+  redis:
+    image: redis:6-alpine
+    restart: always
+    volumes:
+      - redis_storage:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - web
+
+  n8n:
+    <<: *shared
+    ports:
+      - 5678:5678
+
+  n8n-worker:
+    <<: *shared
+    command: worker
+    depends_on:
+      - n8n
